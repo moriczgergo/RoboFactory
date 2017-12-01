@@ -193,8 +193,7 @@ Start::
 	LD A,%11100100
 	LDH [$FF47],A ;initialize 
 	call ClearScreen
-	call copy_tiles
-	call copy_map
+	call CopyGraphics
 	LD A,1	
 	LDH [$FFFF],A ;enable the VBlank interrupt
 	LD A,LCDCF_ON|LCDCF_OBJON|LCDCF_BGON|LCDCF_BG8000
