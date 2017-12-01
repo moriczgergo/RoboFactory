@@ -21,64 +21,74 @@
 ;*	equates
 ;****************************************************************************************************************************************************
 
+	SECTION "Variables",WRAM0[$C000]
+prevjoyread ds 1
+joyread ds 1
+prevjoydread ds 1
+joydread ds 1
+drawit ds 1
+
+	SECTION "OAM Sprite Data",WRAM0[$C100]
+OAM_SPRITES_DATA ds $100
 
 ;****************************************************************************************************************************************************
 ;*	cartridge header
 ;****************************************************************************************************************************************************
 
-	SECTION	"Org $00",HOME[$00]
+	SECTION	"Org $00",ROM0[$00]
 RST_00:	
 	jp	$100
 
-	SECTION	"Org $08",HOME[$08]
+	SECTION	"Org $08",ROM0[$08]
 RST_08:	
 	jp	$100
 
-	SECTION	"Org $10",HOME[$10]
+	SECTION	"Org $10",ROM0[$10]
 RST_10:
 	jp	$100
 
-	SECTION	"Org $18",HOME[$18]
+	SECTION	"Org $18",ROM0[$18]
 RST_18:
 	jp	$100
 
-	SECTION	"Org $20",HOME[$20]
+	SECTION	"Org $20",ROM0[$20]
 RST_20:
 	jp	$100
 
-	SECTION	"Org $28",HOME[$28]
+	SECTION	"Org $28",ROM0[$28]
 RST_28:
 	jp	$100
 
-	SECTION	"Org $30",HOME[$30]
+	SECTION	"Org $30",ROM0[$30]
 RST_30:
 	jp	$100
 
-	SECTION	"Org $38",HOME[$38]
+	SECTION	"Org $38",ROM0[$38]
 RST_38:
 	jp	$100
 
-	SECTION	"V-Blank IRQ Vector",HOME[$40]
+	SECTION	"V-Blank IRQ Vector",ROM0[$40]
 VBL_VECT:
+	call VBScript
 	reti
 	
-	SECTION	"LCD IRQ Vector",HOME[$48]
+	SECTION	"LCD IRQ Vector",ROM0[$48]
 LCD_VECT:
 	reti
 
-	SECTION	"Timer IRQ Vector",HOME[$50]
+	SECTION	"Timer IRQ Vector",ROM0[$50]
 TIMER_VECT:
 	reti
 
-	SECTION	"Serial IRQ Vector",HOME[$58]
+	SECTION	"Serial IRQ Vector",ROM0[$58]
 SERIAL_VECT:
 	reti
 
-	SECTION	"Joypad IRQ Vector",HOME[$60]
+	SECTION	"Joypad IRQ Vector",ROM0[$60]
 JOYPAD_VECT:
 	reti
 	
-	SECTION	"Start",HOME[$100]
+	SECTION	"Start",ROM0[$100]
 	nop
 	jp	Start
 
@@ -134,19 +144,57 @@ JOYPAD_VECT:
 	; $014E-$014F (Cartridge checksum - handled by RGBFIX)
 	DW	$00
 
-
 ;****************************************************************************************************************************************************
 ;*	Program Start
 ;****************************************************************************************************************************************************
 
-	SECTION "Program Start",HOME[$0150]
-TILE_COUNT EQU 64
-TILE_DATA:
-DB $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00 ; tile $00 - all white (0)
-DB $ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff ; tile $01 - black (3)
-DB $00,$ff,$00,$ff,$00,$ff,$00,$ff,$00,$ff,$00,$ff,$00,$ff,$00,$ff ; tile $02 - gray (2)
-DB $ff,$00,$ff,$00,$ff,$00,$ff,$00,$ff,$00,$ff,$00,$ff,$00,$ff,$00 ; tile $03 - lighter gray (1)
+	SECTION "Program Start",ROM0[$0150]
 
+;****************************************************************************************************************************************************
+;* Tile Data
+;****************************************************************************************************************************************************
+TILE_COUNT EQU 288
+TILE_DATA:
+DB $00,$00,$00,$00,$00,$00,$00,$00
+DB $00,$00,$00,$00,$00,$00,$00,$00
+DB $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+DB $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+DB $00,$FF,$00,$FF,$00,$FF,$00,$FF
+DB $00,$FF,$00,$FF,$00,$FF,$00,$FF
+DB $FF,$00,$FF,$00,$FF,$00,$FF,$00
+DB $FF,$00,$FF,$00,$FF,$00,$FF,$00
+DB $FF,$EE,$FF,$AA,$FF,$AA,$FF,$AA
+DB $FF,$AA,$FF,$AA,$FF,$AB,$FF,$BA
+DB $00,$00,$5A,$5A,$24,$24,$42,$42
+DB $42,$42,$24,$24,$5A,$5A,$00,$00
+DB $BD,$BD,$42,$42,$81,$81,$81,$81
+DB $81,$81,$81,$81,$42,$42,$BD,$BD
+DB $00,$00,$00,$00,$24,$24,$18,$18
+DB $18,$18,$24,$24,$00,$00,$00,$00
+DB $18,$18,$3C,$3C,$5A,$5A,$81,$81
+DB $18,$18,$3C,$3C,$3C,$3C,$18,$18
+DB $08,$08,$04,$04,$62,$62,$F7,$F7
+DB $F7,$F7,$62,$62,$04,$04,$08,$08
+DB $07,$07,$04,$04,$04,$04,$04,$04
+DB $04,$04,$FC,$FC,$80,$80,$80,$80
+DB $80,$80,$80,$80,$FC,$FC,$04,$04
+DB $04,$04,$04,$04,$04,$04,$07,$07
+DB $1F,$1F,$3F,$3F,$70,$70,$E0,$E0
+DB $C7,$C7,$C4,$C4,$C4,$C4,$C4,$C4
+DB $C7,$C7,$C4,$C4,$C4,$C4,$C4,$C4
+DB $E0,$E0,$70,$70,$3F,$3F,$1F,$1F
+DB $1F,$1F,$3F,$3F,$70,$70,$E0,$E0
+DB $C7,$C7,$C4,$C4,$C4,$C4,$C4,$C4
+DB $C4,$C4,$C4,$C4,$C4,$C4,$E7,$E7
+DB $F0,$F0,$78,$78,$3F,$3F,$1F,$1F
+DB $F8,$F8,$FC,$FC,$0E,$0E,$07,$07
+DB $C3,$C3,$23,$23,$23,$23,$C3,$C3
+DB $23,$23,$23,$23,$23,$23,$C7,$C7
+DB $0F,$0F,$1E,$1E,$FC,$FC,$F8,$F8
+
+;****************************************************************************************************************************************************
+;* Map Data
+;****************************************************************************************************************************************************
 MAP_SIZE EQU 1024 
 MAP_DATA:
 DB $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
@@ -182,6 +230,18 @@ DB $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$
 DB $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 DB $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 
+OAM_SPRITES_SIZE EQU 16
+OAM_SPRITES:
+DB 128,64,12,%00000000
+DB 136,64,13,%00000000
+DB 128,72,12,%00100000
+DB 136,72,13,%00100000
+DB 128,96,10,%00000000
+DB 136,96,11,%00000000
+DB 128,104,10,%00100000
+DB 136,104,11,%00100000
+DB 130,100,8,%00000000
+
 Start::
 	DI ;disable interrupts while init
 .WAIT
@@ -194,15 +254,160 @@ Start::
 	LDH [$FF47],A ;initialize 
 	call ClearScreen
 	call CopyGraphics
-	LD A,1	
+	LD A, $FF
+	LD [joyread], A
+	LD [prevjoyread], A
+	LD A, $00
+	LD [drawit],A
+	LD HL,OAM_DMA
+	LD BC,$1080
+.oamcopy
+	LD A,[HL+]
+	LD [C],A
+	INC C
+	DEC B
+	JR NZ,.oamcopy
+	LD A,%00000001
 	LDH [$FFFF],A ;enable the VBlank interrupt
 	LD A,LCDCF_ON|LCDCF_OBJON|LCDCF_BGON|LCDCF_BG8000
 	LD [rLCDC],A ;enable and configure screen
 	EI ;enable interrupts
+	LD B,0
 	jr loop
 
+OAM_DMA:
+    ld    a,high(OAM_SPRITES)
+    ld    [rDMA],a
+    ld    a,$28
+.wait
+    dec    a
+    jr    nz,.wait
+    ret
+
 loop::
+	call JoypadRead
+	call JoypadDRead
+	call joypad_test
 	jr loop
+
+JoypadRead::
+	ld hl, $FF00 ;joypad data address
+	SET 4, [HL]
+	RES 5, [HL] ;set up joypad
+	LD A, [HL] ;load joypad data into A
+	ld hl, prevjoyread ;load prevjoyread's address into HL
+	CP [hl] ;compare prevjoyread with joypad data
+	jr z,.EQ
+	jr .DIFF
+.EQ
+	LD HL,joyread
+	LD [HL],%11111111
+	jr .RETURN
+.DIFF
+	LD [joyread],A
+	jr .RETURN
+.RETURN
+	LD [prevjoyread],A
+	ret
+
+JoypadDRead::
+	ld hl, $FF00 ;joypad data address
+	SET 5, [HL]
+	RES 4, [HL] ;set up joypad
+	LD A, [HL] ;load joypad data into A
+	ld hl, prevjoydread ;load prevjoydread's address into HL
+	CP [hl] ;compare prevjoydread with joypad data
+	jr z,.EQ
+	jr .DIFF
+.EQ
+	LD HL,joydread
+	LD [HL],%11111111
+	jr .RETURN
+.DIFF
+	LD [joydread],A
+	jr .RETURN
+.RETURN
+	LD [prevjoydread],A
+	ret
+
+joypad_test::
+	LD HL, joyread
+	BIT 0, [HL] ; test A button
+	jr nz,.RETURN
+	;inc b
+	LD A,1
+	LD [drawit],A
+	jr .RETURN
+.RETURN
+	ret
+
+draw_oam::
+	LD HL,$FE00
+	LD [HL],128 ;Y
+	INC HL
+	LD [HL],64 ;X
+	INC HL
+	LD [HL],12
+	INC HL
+	LD [HL],$00
+	INC HL
+	LD [HL],136 ;Y
+	INC HL
+	LD [HL],64 ;X
+	INC HL
+	LD [HL],13
+	INC HL
+	LD [HL],$00
+	INC HL
+	LD [HL],128 ;Y
+	INC HL
+	LD [HL],72 ;X
+	INC HL
+	LD [HL],12
+	INC HL
+	LD [HL],%00100000
+	INC HL
+	LD [HL],136 ;Y
+	INC HL
+	LD [HL],72 ;X
+	INC HL
+	LD [HL],13
+	INC HL
+	LD [HL],%00100000
+	INC HL
+	LD [HL],128 ;Y
+	INC HL
+	LD [HL],96 ;X
+	INC HL
+	LD [HL],12
+	INC HL
+	LD [HL],$00
+	INC HL
+	LD [HL],136 ;Y
+	INC HL
+	LD [HL],96 ;X
+	INC HL
+	LD [HL],13
+	INC HL
+	LD [HL],$00
+	INC HL
+	LD [HL],128 ;Y
+	INC HL
+	LD [HL],104 ;X
+	INC HL
+	LD [HL],12
+	INC HL
+	LD [HL],%00100000
+	INC HL
+	LD [HL],136 ;Y
+	INC HL
+	LD [HL],104 ;X
+	INC HL
+	LD [HL],13
+	INC HL
+	LD [HL],%00100000
+	INC HL
+	ret
 
 copy_tiles::
 	ld de, TILE_DATA
@@ -240,9 +445,28 @@ copy_map::
 	jr nz,.loop
 	ret
 
+copy_oam::
+	ld de, OAM_SPRITES
+	ld hl, OAM_SPRITES_DATA
+	ld bc, OAM_SPRITES_SIZE
+	inc b
+	inc c
+	jr .skip
+.loop
+	ld a, [de]
+	ld [hli], a
+	inc de
+.skip
+	dec c
+	jr nz,.loop
+	dec b
+	jr nz,.loop
+	ret
+
 CopyGraphics::
 	call copy_tiles
 	call copy_map
+	call copy_oam
 	ret
 
 wipe_map::
@@ -259,7 +483,7 @@ wipe_map::
 
 wipe_oam::
 	ld  hl,$fe00
-	ld  b,$a0
+	ld  b,$9F
 	xor a
 .loop
 	ld  [hl+],a
@@ -272,4 +496,21 @@ ClearScreen::
 	call wipe_oam
 	ret
 
+VBScript::
+	PUSH AF
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	LD HL, drawit
+	BIT 0,[HL]
+	jr z, .RETURN
+	call $FF80
+	LD [HL], $00
+	jr .RETURN
+.RETURN
+	POP HL
+	POP DE
+	POP BC
+	POP AF
+	ret
 ;*** End Of File ***
