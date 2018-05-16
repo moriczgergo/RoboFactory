@@ -267,9 +267,7 @@ Start::
 	LD [joyread], A
 	LD [prevjoyread], A
 
-	; reset oamupdated variable to 0
-	LD A, $00
-	LD [oamupdated],A
+	LD [oamupdated], A ; set OAMUpdated to $FF for initial print
 
 	; prepare OAM_DMA copy to HRAM
 	LD HL,OAM_DMA ; load OAM_DMA's address to HL
