@@ -22,11 +22,13 @@
 ;****************************************************************************************************************************************************
 
 	SECTION "Variables",WRAM0[$C000]
-prevjoyread ds 1
-joyread ds 1
-prevjoydread ds 1
-joydread ds 1
-drawit ds 1
+; variables for joypad read algorithms
+prevjoyread ds 1 ; used by JoypadRead, has nothing usable for other stuff.
+joyread ds 1 ; set by JoypadRead, $FF if it's the same as the previously processed joypad data
+prevjoydread ds 1 ; used by JoypadDRead, has nothing usable for other stuff.
+joydread ds 1 ; set by JoypadDRead, $FF if it's the same as the previously processed joydpad data
+; GUI variables
+oamupdated ds 1 ; if oamupdated's bit 0 is set, the OAM data will be updated on the latest VBlank, and oamupdated will be set to 0.
 
 	SECTION "OAM Sprite Data",WRAM0[$C100]
 OAM_SPRITES_DATA ds $100
@@ -248,41 +250,58 @@ Start::
 	LDH A,[$FF44] ;get current scanline
 	CP $91 ;check if scanline is in VBlank
 	JR NZ,.WAIT ;wait if we aren't in VBlank yet
+
+	;disable screen
 	LD A,0
-	LDH [rLCDC],A ;disable screen
+	LDH [rLCDC],A
+
+	;initialize screen
 	LD A,%11100100
-	LDH [$FF47],A ;initialize 
+	LDH [$FF47],A
+
 	call ClearScreen
 	call CopyGraphics
+
+	; reset joypad reads to $FF
 	LD A, $FF
 	LD [joyread], A
 	LD [prevjoyread], A
+
+	; reset oamupdated variable to 0
 	LD A, $00
-	LD [drawit],A
-	LD HL,OAM_DMA
-	LD BC,$1080
-.oamcopy
-	LD A,[HL+]
-	LD [C],A
-	INC C
-	DEC B
-	JR NZ,.oamcopy
+	LD [oamupdated],A
+
+	; prepare OAM_DMA copy to HRAM
+	LD HL,OAM_DMA ; load OAM_DMA's address to HL
+	LD BC,$1080 ; B=$10, a.k.a. $10 bytes to copy, C=$80 a.k.a copy to $(FF)80
+.oamcopy ; this is the routine to copy OAM_DMA to HRAM
+	LD A,[HL+] ; load current value at HL and increment HL
+	LD [C],A ; save loaded HL value to C's place
+
+	INC C ; increment copy addr
+	DEC B ; decrement bytes-to-copy counter
+	JR NZ,.oamcopy ; if B wasn't zero after decrementing, repeat copy
+.videoinit
+	;enable the VBlank interrupt
 	LD A,%00000001
-	LDH [$FFFF],A ;enable the VBlank interrupt
-	LD A,LCDCF_ON|LCDCF_OBJON|LCDCF_BGON|LCDCF_BG8000
-	LD [rLCDC],A ;enable and configure screen
+	LDH [$FFFF],A
+
+	;enable and configure screen
+	LD A,LCDCF_ON|LCDCF_OBJON|LCDCF_BGON|LCDCF_BG8000 ; OR is fun!
+	LD [rLCDC],A ; rLCDC: LCD config register defined in HARDWARE.INC
+.loopjump
 	EI ;enable interrupts
-	LD B,0
+	LD B,0 ; setup B for loop
 	jr loop
 
-OAM_DMA:
+OAM_DMA: ; note: i can't comment this properly, due to lack of knowledge. if you do, open an issue on GitHub explaning this.
     ld    a,high(OAM_SPRITES)
     ld    [rDMA],a
     ld    a,$28
-.wait
-    dec    a
-    jr    nz,.wait
-    ret
+.wait ; wait for $28(*2?) cycles
+    dec    a ; decrement A
+    jr    nz,.wait ; if A isn't zero yet, jump back to .wait
+    ret ; OAM_DMA will be `call`-ed. let's use `ret` to return to the rest of the VBlank code!
 
 loop::
 	call JoypadRead
@@ -290,44 +309,50 @@ loop::
 	call joypad_test
 	jr loop
 
-JoypadRead::
-	ld hl, $FF00 ;joypad data address
+JoypadRead:: ; reads joypad ABSelectStart data
+	ld hl, $FF00 ; load the joypad data address into HL
+
+	; set up joypad, select to read ABSelectStart
 	SET 4, [HL]
-	RES 5, [HL] ;set up joypad
+	RES 5, [HL] ; reset D-Pad read bit, in case it's set
+
 	LD A, [HL] ;load joypad data into A
 	ld hl, prevjoyread ;load prevjoyread's address into HL
-	CP [hl] ;compare prevjoyread with joypad data
-	jr z,.EQ
-	jr .DIFF
-.EQ
-	LD HL,joyread
-	LD [HL],%11111111
+	CP [hl] ;compare previous joypad data with currentjoypad data
+	jr z,.EQ ; if they're the same, jump to .EQ
+	jr .DIFF ; if they aren't the same, jump to .DIFF
+.EQ ; this will be jumped to if the joypad data hasn't changed yet
+	LD HL,joyread ; load joyread's address into HL
+	LD [HL],%11111111 ; set joyread to $FF, representing that the value hasn't changed from the previous one
 	jr .RETURN
 .DIFF
-	LD [joyread],A
+	LD [joyread],A ; load new data into joydread
 	jr .RETURN
 .RETURN
-	LD [prevjoyread],A
+	LD [prevjoyread],A ; load new data into prevjoyread
 	ret
 
-JoypadDRead::
-	ld hl, $FF00 ;joypad data address
+JoypadDRead:: ; reads joypad D-Pad data
+	ld hl, $FF00 ; load the joypad data address into HL
+
+	; set up joypad, select to read D-Pad
 	SET 5, [HL]
-	RES 4, [HL] ;set up joypad
+	RES 4, [HL] ; reset ABSelectStart read bit, in case it's set
+
 	LD A, [HL] ;load joypad data into A
 	ld hl, prevjoydread ;load prevjoydread's address into HL
-	CP [hl] ;compare prevjoydread with joypad data
-	jr z,.EQ
-	jr .DIFF
+	CP [hl] ;compare previous joypad data with current joypad data
+	jr z,.EQ ; if they're the same, jump to .EQ
+	jr .DIFF ; if they aren't the same, jump to .DIFF
 .EQ
-	LD HL,joydread
-	LD [HL],%11111111
+	LD HL,joydread ; load joydread's address into HL
+	LD [HL],%11111111 ; set joydread to $FF, representing that the value hasn't changed from the previous one
 	jr .RETURN
 .DIFF
-	LD [joydread],A
+	LD [joydread],A ; load new data into joydread
 	jr .RETURN
 .RETURN
-	LD [prevjoydread],A
+	LD [prevjoydread],A ; load new data into prevjoydread
 	ret
 
 joypad_test::
@@ -336,63 +361,75 @@ joypad_test::
 	jr nz,.RETURN
 	;inc b
 	LD A,1
-	LD [drawit],A
+	LD [oamupdated],A
 	jr .RETURN
 .RETURN
 	ret
 
-copy_tiles::
-	ld de, TILE_DATA
-	ld hl, $8000
-	ld bc, TILE_COUNT
+copy_tiles:: ; copies BG tiles
+	; setting up base addresses
+	ld de, TILE_DATA ; load local tile data address
+	ld hl, $8000 ; load destination address
+	ld bc, TILE_COUNT ; load count of bytes in the tile data
+
+	; increase b and c, since we're jumping to .skip by default
 	inc b
 	inc c
+
 	jr .skip
 .loop
-	ld a, [de]
-	ld [hli], a
-	inc de
+	ld a, [de] ; load current tile data into A
+	ld [hli], a ; load current tile data from A into HL, and increment HL
+	inc de ; increment DE
 .skip
-	dec c
-	jr nz,.loop
-	dec b
-	jr nz,.loop
+	dec c ; decrement c
+	jr nz,.loop ; if it's not zero, copy again
+	dec b ; decrement b
+	jr nz,.loop ; if it's not zero, copy again
 	ret
 
-copy_map::
-	ld de, MAP_DATA
-	ld hl, $9800
-	ld bc, MAP_SIZE
+copy_map:: ; copies BG tile map
+	; setting up base addresses
+	ld de, MAP_DATA ; load local map data address
+	ld hl, $9800 ; load destination address
+	ld bc, MAP_SIZE ; load count of bytes in the map
+
+	; increase b and c, since we're jumping to .skip by default
 	inc b
 	inc c
+
 	jr .skip
 .loop
-	ld a, [de]
-	ld [hli], a
-	inc de
+	ld a, [de] ; load current tile data into A
+	ld [hli], a ; load current tile data from A into HL, and increment HL
+	inc de ; increment DE
 .skip
-	dec c
-	jr nz,.loop
-	dec b
-	jr nz,.loop
+	dec c ; decrement c
+	jr nz,.loop ; if it's not zero, copy again
+	dec b ; decrement b
+	jr nz,.loop ; if it's not zero, copy again
 	ret
 
-copy_oam::
-	ld de, OAM_SPRITES
-	ld hl, OAM_SPRITES_DATA
-	ld bc, OAM_SPRITES_SIZE
+copy_oam:: ; copies OAM sprite data
+	; setting up base addresses
+	ld de, OAM_SPRITES ; load local OAM data address
+	ld hl, OAM_SPRITES_DATA ; load destination address
+	ld bc, OAM_SPRITES_SIZE ; load count of bytes in the OAM sprites
+
+	; increase b and c, since we're jumping to .skip by default
 	inc b
 	inc c
+
 	jr .skip
 .loop
-	ld a, [de]
-	ld [hli], a
-	inc de
+	ld a, [de] ; load current tile data into A
+	ld [hli], a ; load current tile data from A into HL, and increment HL
+	inc de ; increment DE
 .skip
-	dec c
-	jr nz,.loop
-	dec b
-	jr nz,.loop
+	dec c ; decrement c
+	jr nz,.loop ; if it's not zero, copy again
+	dec b ; decrement b
+	jr nz,.loop ; if it's not zero, copy again
 	ret
 
 CopyGraphics::
@@ -401,26 +438,26 @@ CopyGraphics::
 	call copy_oam
 	ret
 
-wipe_map::
-	ld  hl,$9800
-	ld  bc,$07FF
+wipe_map:: ; wipes BG tile map
+	ld  hl,$9800 ; load map data address
+	ld  bc,$07FF ; bytes to clear count
 .loop
-	xor a
-	ld  [hl+],a
-	dec bc
-	ld  a,b
-	or  c
-	jr  nz,.loop
+	xor a ; quickhand ld a,0
+	ld  [hl+],a ; load hl with 0, and increment hl
+	dec bc ; decrease counter
+	ld  a,b ; load upper 8bits of counter into a
+	or  c ; a | c, check if the whole counter is 0
+	jr  nz,.loop ; if it's not zero, loop again
 	ret
 
 wipe_oam::
-	ld  hl,$fe00
-	ld  b,$9F
-	xor a
+	ld  hl,$fe00 ; load OAM data address
+	ld  b,$9F ; bytes to clear count
+	xor a ; quickhand ld a,0
 .loop
-	ld  [hl+],a
-	dec b
-	jr  nz,.loop
+	ld  [hl+],a ; load hl contents with 0, and increment hl
+	dec b ; decrease b
+	jr  nz,.loop ; if it's not zero, loop again
 	ret
 
 ClearScreen::
@@ -428,18 +465,20 @@ ClearScreen::
 	call wipe_oam
 	ret
 
-VBScript::
+VBScript:: ; vblank procedure
+	; push all registers to stack
 	PUSH AF
 	PUSH BC
 	PUSH DE
 	PUSH HL
-	LD HL, drawit
-	BIT 0,[HL]
-	jr z, .RETURN
-	call $FF80
-	LD [HL], $00
-	jr .RETURN
+
+	LD HL, oamupdated ; load oamupdated's address to HL
+	BIT 0,[HL] ; check but 0 of oamupdated
+	jr z, .RETURN ; if it's zero, we don't need to draw the OAM, so just jump to return.
+	call $FF80 ; let's call OAM_DMA, copied to $FF80 by Start.oamcopy
+	LD [HL], $00 ; resetting oamupdated
 .RETURN
+	; restore the registers from stack
 	POP HL
 	POP DE
 	POP BC
