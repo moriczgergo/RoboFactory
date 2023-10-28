@@ -232,17 +232,32 @@ DB $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$
 DB $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 DB $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 
-OAM_SPRITES_SIZE EQU 16
 OAM_SPRITES:
-DB 128,64,12,%00000000
-DB 136,64,13,%00000000
-DB 128,72,12,%00100000
-DB 136,72,13,%00100000
-DB 128,96,10,%00000000
-DB 136,96,11,%00000000
-DB 128,104,10,%00100000
-DB 136,104,11,%00100000
-DB 130,100,8,%00000000
+; A
+;DB 128,48,12,%00000000
+;DB 136,48,13,%00000000
+;DB 128,56,12,%00100000
+;DB 136,56,13,%00100000
+
+; DPAD up
+;DB 128,80,10,%00000000
+;DB 136,80,11,%00000000
+;DB 128,88,10,%00100000
+;DB 136,88,11,%00100000
+;DB 130,84,8,%00000000
+
+; DPAD left
+;DB 128,80,10,%00000000
+;DB 136,80,11,%00000000
+;DB 128,88,10,%00100000
+;DB 136,88,11,%00100000
+;DB 132,82,9,%00100000
+
+; B
+;DB 128,112,12,%00000000
+;DB 136,112,12,%01000000
+;DB 128,120,16,%00000000
+;DB 136,120,17,%00000000
 
 Start::
 	DI ;disable interrupts while init
@@ -258,9 +273,6 @@ Start::
 	;initialize screen
 	LD A,%11100100
 	LDH [$FF47],A
-
-	call ClearScreen
-	call CopyGraphics
 
 	; reset joypad reads to $FF
 	LD A, $FF
@@ -279,6 +291,9 @@ Start::
 	INC C ; increment copy addr
 	DEC B ; decrement bytes-to-copy counter
 	JR NZ,.oamcopy ; if B wasn't zero after decrementing, repeat copy
+.graphicscopy
+	call ClearScreen
+	call CopyGraphics
 .videoinit
 	;enable the VBlank interrupt
 	LD A,%00000001
@@ -292,8 +307,8 @@ Start::
 	LD B,0 ; setup B for loop
 	jr loop
 
-OAM_DMA: ; note: i can't comment this properly, due to lack of knowledge. if you do, open an issue on GitHub explaning this.
-    ld    a,high(OAM_SPRITES)
+OAM_DMA: ; note: i can't comment this properly, due to lack of knowledge. if you do, openyan issue on GitHub explaning this.
+    ld    a,high(OAM_SPRITES_DATA)
     ld    [rDMA],a
     ld    a,$28
 .wait ; wait for $28(*2?) cycles
@@ -364,6 +379,151 @@ joypad_test::
 .RETURN
 	ret
 
+; A - first button
+; B - second button, set to $FF to ignore it
+; C - third button, set to $FF to ignore it
+; changes A, B, C, and HL
+draw_buttons::
+	call wipe_local_oam ; respects registers!
+	LD HL, OAM_SPRITES_DATA
+.firstButton
+	CP $FF
+	jr z,.secondButton
+.firstA
+	LD [hli], 128
+	LD [hli], 48
+	LD [hli], 12
+	LD [hli], 0
+	LD [hli], 136
+	LD [hli], 48
+	LD [hli], 13
+	LD [hli], 0
+	LD [hli], 128
+	LD [hli], 56
+	LD [hli], 12
+	LD [hli], %00100000
+	LD [hli], 136
+	LD [hli], 56
+	LD [hli], 13
+	LD [hli], %00100000
+	jr .secondButton
+.firstB
+	LD [hli], 128
+	LD [hli], 48
+	LD [hli], 12
+	LD [hli], 0
+	LD [hli], 136
+	LD [hli], 48
+	LD [hli], 12
+	LD [hli], %01000000
+	LD [hli], 128
+	LD [hli], 56
+	LD [hli], 16
+	LD [hli], 0
+	LD [hli], 136
+	LD [hli], 56
+	LD [hli], 17
+	LD [hli], 0
+	jr .secondButton
+.firstUp
+	LD [hli], 128
+	LD [hli], 48
+	LD [hli], 10
+	LD [hli], 0
+	LD [hli], 136
+	LD [hli], 48
+	LD [hli], 11
+	LD [hli], 0
+	LD [hli], 128
+	LD [hli], 56
+	LD [hli], 10
+	LD [hli], %00100000
+	LD [hli], 136
+	LD [hli], 56
+	LD [hli], 11
+	LD [hli], %00100000
+	LD [hli], 130
+	LD [hli], 52
+	LD [hli], 8
+	LD [hli], 0
+	jr .secondButton
+.firstDown
+	LD [hli], 128
+	LD [hli], 48
+	LD [hli], 10
+	LD [hli], 0
+	LD [hli], 136
+	LD [hli], 48
+	LD [hli], 11
+	LD [hli], 0
+	LD [hli], 128
+	LD [hli], 56
+	LD [hli], 10
+	LD [hli], %00100000
+	LD [hli], 136
+	LD [hli], 56
+	LD [hli], 11
+	LD [hli], %00100000
+	LD [hli], 130
+	LD [hli], 52
+	LD [hli], 8
+	LD [hli], %01000000
+	jr .secondButton
+.firstLeft
+	LD [hli], 128
+	LD [hli], 48
+	LD [hli], 10
+	LD [hli], 0
+	LD [hli], 136
+	LD [hli], 48
+	LD [hli], 11
+	LD [hli], 0
+	LD [hli], 128
+	LD [hli], 56
+	LD [hli], 10
+	LD [hli], %00100000
+	LD [hli], 136
+	LD [hli], 56
+	LD [hli], 11
+	LD [hli], %00100000
+	LD [hli], 130
+	LD [hli], 52
+	LD [hli], 9
+	LD [hli], %01000000
+	jr .secondButton
+.firstRight
+	LD [hli], 128
+	LD [hli], 48
+	LD [hli], 10
+	LD [hli], 0
+	LD [hli], 136
+	LD [hli], 48
+	LD [hli], 11
+	LD [hli], 0
+	LD [hli], 128
+	LD [hli], 56
+	LD [hli], 10
+	LD [hli], %00100000
+	LD [hli], 136
+	LD [hli], 56
+	LD [hli], 11
+	LD [hli], %00100000
+	LD [hli], 130
+	LD [hli], 52
+	LD [hli], 9
+	LD [hli], 0
+	jr .secondButton
+.secondButton
+	LD A, B
+	CP $FF
+	jr z,.thirdButton
+.thirdButton
+	LD A, C
+	CP $FF
+	jr z,.RETURN
+.RETURN
+	ret
+
 copy_tiles:: ; copies BG tiles
 	; setting up base addresses
 	ld de, TILE_DATA ; load local tile data address
@@ -408,32 +568,9 @@ copy_map:: ; copies BG tile map
 	jr nz,.loop ; if it's not zero, copy again
 	ret
 
-copy_oam:: ; copies OAM sprite data
-	; setting up base addresses
-	ld de, OAM_SPRITES ; load local OAM data address
-	ld hl, OAM_SPRITES_DATA ; load destination address
-	ld bc, OAM_SPRITES_SIZE ; load count of bytes in the OAM sprites
-
-	; increase b and c, since we're jumping to .skip by default
-	inc b
-	inc c
-
-	jr .skip
-.loop
-	ld a, [de] ; load current tile data into A
-	ld [hli], a ; load current tile data from A into HL, and increment HL
-	inc de ; increment DE
-.skip
-	dec c ; decrement c
-	jr nz,.loop ; if it's not zero, copy again
-	dec b ; decrement b
-	jr nz,.loop ; if it's not zero, copy again
-	ret
-
 CopyGraphics::
 	call copy_tiles
 	call copy_map
-	call copy_oam
 	ret
 
 wipe_map:: ; wipes BG tile map
@@ -458,9 +595,32 @@ wipe_oam::
 	jr  nz,.loop ; if it's not zero, loop again
 	ret
 
+wipe_local_oam::
+	PUSH AF
+	PUSH BC
+	PUSH DE
+	PUSH HL
+
+	ld HL,OAM_SPRITES_DATA
+	xor a
+	ld bc,$100
+.loop
+	ld [hli],a
+	dec c
+	jr nz,.loop
+	dec b
+	jr nz,.loop
+
+	POP AF
+	POP BC
+	POP DE
+	POP HL
+	ret
+
 ClearScreen::
 	call wipe_map
 	call wipe_oam
+	call wipe_local_oam
 	ret
 
 VBScript:: ; vblank procedure
